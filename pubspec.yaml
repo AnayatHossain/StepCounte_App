@@ -1,0 +1,50 @@
+name: step_counter
+description: "A new Flutter project."
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  intl: ^0.20.2
+  pedometer: ^4.1.1
+  permission_handler: ^12.0.0+1
+  shared_preferences: ^2.5.3
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/step_count.png
+  windows:
+    generate: true
+    image_path: assets/step_count.png
+  macos:
+    generate: true
+    image_path: assets/step_count.png
+  linux:
+    generate: true
+    image_path: assets/step_count.png
+  web:
+    generate: true
+    image_path: assets/step_count.png
+
+flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
