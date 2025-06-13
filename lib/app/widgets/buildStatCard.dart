@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 
 Widget buildStatCard({
-  required IconData icon,
+  required String animationPath, // Lottie animation path
   required String value,
   required String unit,
   required bool isDarkTheme,
@@ -26,7 +27,15 @@ Widget buildStatCard({
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 28, color: color),
+          SizedBox(
+            height: 40,
+            child: Lottie.asset(
+              animationPath,
+              fit: BoxFit.contain,
+              repeat: true,
+              frameRate: FrameRate.max,
+            ),
+          ),
           const SizedBox(height: 10),
           Text(
             value,

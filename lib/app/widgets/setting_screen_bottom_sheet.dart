@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:hive/hive.dart';
+import 'package:step_counter/app/versions/version.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SettingScreenBottomSheet extends StatefulWidget {
@@ -344,7 +345,7 @@ class _SettingScreenBottomSheetState extends State<SettingScreenBottomSheet> {
                 child: Column(
                   children: [
                     Text(
-                      widget.isEnglish ? "Version 1.0.1" : "ভার্সন ১.০.১",
+                      getVersion(widget.isEnglish),
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,

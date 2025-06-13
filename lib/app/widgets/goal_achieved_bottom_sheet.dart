@@ -21,18 +21,6 @@ class GoalAchievedBottomSheet extends StatefulWidget {
 }
 
 class _GoalAchievedBottomSheetState extends State<GoalAchievedBottomSheet> {
-  bool _showCelebration = true;
-
-  @override
-  void initState() {
-    super.initState();
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted) {
-        setState(() => _showCelebration = false);
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -45,15 +33,15 @@ class _GoalAchievedBottomSheetState extends State<GoalAchievedBottomSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Celebration Animation
-            if (_showCelebration)
-              SizedBox(
-                height: 200,
-                child: Lottie.asset(
-                  'assets/celebration.json',
-                  fit: BoxFit.contain,
-                ),
+            // Celebration Animation (always visible)
+            SizedBox(
+              height: 200,
+              child: Lottie.asset(
+                'assets/successful.json',
+                fit: BoxFit.contain,
+                repeat: true,
               ),
+            ),
 
             // Success Message
             Text(
@@ -66,7 +54,7 @@ class _GoalAchievedBottomSheetState extends State<GoalAchievedBottomSheet> {
             ),
             const SizedBox(height: 15),
 
-            // Steps Info
+            // Steps Info Card
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(

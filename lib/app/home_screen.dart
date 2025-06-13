@@ -6,9 +6,13 @@ import 'package:intl/intl.dart';
 import 'package:pedometer/pedometer.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:step_counter/app/widgets/buildStatCard.dart';
+import 'package:step_counter/app/widgets/daily_goal_dialog.dart';
+import 'package:step_counter/app/widgets/goal_achieved_bottom_sheet.dart';
 import 'package:step_counter/app/widgets/setting_screen_bottom_sheet.dart';
-import 'package:step_counter/app/widgets/successful_bottom_sheet.dart';
+import 'package:step_counter/app/widgets/stats_row.dart';
+import 'package:step_counter/app/widgets/step_progress_section.dart';
+import 'package:step_counter/app/widgets/weekly_stats_cards.dart';
+import 'package:step_counter/app/widgets/weekly_steps_chart.dart';
 
 class HomeScreen extends StatefulWidget {
   final bool isDarkTheme;
@@ -291,28 +295,47 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _saveSteps() async {
     final prefs = await SharedPreferences.getInstance();
     final today = _getDateKey();
+
     await prefs.setInt('steps_$today', _steps);
     await prefs.setString('last_date', today);
+    await prefs.setDouble('calories_$today', _calories);
+    await prefs.setDouble('distance_$today', _distance);
 
-    // Update weekly data for today
-    final todayData = _weeklyData.firstWhere(
-      (data) => DateFormat('dd-MM-yyyy').format(data['date']) == today,
-      orElse: () => {
+    if (_walkingStartTime != null) {
+      final walkedMinutes = DateTime.now()
+          .difference(_walkingStartTime!)
+          .inMinutes;
+      final prevMinutes = prefs.getInt('minutes_$today') ?? 0;
+      await prefs.setInt('minutes_$today', prevMinutes + walkedMinutes);
+    }
+
+    final updatedWeeklyData = List<Map<String, dynamic>>.from(_weeklyData);
+    bool found = false;
+
+    for (int i = 0; i < updatedWeeklyData.length; i++) {
+      final data = updatedWeeklyData[i];
+      if (DateFormat('dd-MM-yyyy').format(data['date']) == today) {
+        updatedWeeklyData[i] = {
+          'date': data['date'],
+          'steps': _steps,
+          'day': data['day'],
+        };
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      updatedWeeklyData.removeAt(0);
+      updatedWeeklyData.add({
         'date': DateTime.now(),
         'steps': _steps,
         'day': DateFormat('E').format(DateTime.now()),
-      },
-    );
-
-    todayData['steps'] = _steps;
+      });
+    }
 
     setState(() {
-      _weeklyData = _weeklyData.map((data) {
-        if (DateFormat('dd-MM-yyyy').format(data['date']) == today) {
-          return {'date': data['date'], 'steps': _steps, 'day': data['day']};
-        }
-        return data;
-      }).toList();
+      _weeklyData = updatedWeeklyData;
     });
   }
 
@@ -332,81 +355,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
     await prefs.setInt('steps_$today', 0);
     await prefs.setString('last_date', today);
-
-    // Update weekly data for today only
-    setState(() {
-      _weeklyData = _weeklyData.map((data) {
-        if (DateFormat('dd-MM-yyyy').format(data['date']) == today) {
-          return {'date': data['date'], 'steps': 0, 'day': data['day']};
-        }
-        return data;
-      }).toList();
-    });
   }
 
   void _showDailyGoalDialog() {
-    final controller = TextEditingController(text: '$_dailyGoal');
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: widget.isDarkTheme ? Colors.grey[900] : Colors.white,
-        title: Text(
-          widget.isEnglish ? 'Set Daily Goal' : 'দৈনিক লক্ষ্য নির্ধারণ করুন',
-          style: TextStyle(
-            color: widget.isDarkTheme ? Colors.white : Colors.black,
-          ),
-        ),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          style: TextStyle(
-            color: widget.isDarkTheme ? Colors.white : Colors.black,
-          ),
-          decoration: InputDecoration(
-            labelText: widget.isEnglish ? 'Steps Goal' : 'পদক্ষেপের লক্ষ্য',
-            labelStyle: TextStyle(
-              color: widget.isDarkTheme ? Colors.white70 : Colors.grey[800],
-            ),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(
-                color: widget.isDarkTheme ? Colors.white54 : Colors.grey,
-              ),
-            ),
-            focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.blue),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            child: Text(
-              widget.isEnglish ? 'Cancel' : 'বাতিল',
-              style: TextStyle(
-                color: widget.isDarkTheme ? Colors.white : Colors.black,
-              ),
-            ),
-            onPressed: () => Navigator.pop(context),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-            ),
-            child: Text(widget.isEnglish ? 'Save' : 'সংরক্ষণ করুন'),
-            onPressed: () async {
-              final newGoal = int.tryParse(controller.text) ?? _dailyGoal;
-              setState(() {
-                _dailyGoal = newGoal;
-                _goalAchievedShown = _steps >= newGoal;
-              });
-
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setInt('dailyGoal', newGoal);
-
-              Navigator.pop(context);
-            },
-          ),
-        ],
+      builder: (context) => DailyGoalDialog(
+        isDarkTheme: widget.isDarkTheme,
+        isEnglish: widget.isEnglish,
+        currentGoal: _dailyGoal,
+        onGoalChanged: (newGoal) {
+          setState(() {
+            _dailyGoal = newGoal;
+            _goalAchievedShown = _steps >= newGoal;
+          });
+        },
       ),
     );
   }
@@ -446,8 +409,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       builder: (context) => SettingScreenBottomSheet(
                         isDarkTheme: widget.isDarkTheme,
                         isEnglish: widget.isEnglish,
-                        onThemeChanged: widget.onThemeChanged,
-                        onLanguageChanged: widget.onLanguageChanged,
+                        onThemeChanged: (newTheme) {
+                          setState(() {
+                            widget.onThemeChanged(newTheme);
+                          });
+                        },
+                        onLanguageChanged: (newLang) {
+                          setState(() {
+                            widget.onLanguageChanged(newLang);
+                          });
+                        },
                       ),
                     );
                   },
@@ -500,204 +471,39 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildStepBody(Color txtColor) {
-    final progress = _dailyGoal != 0 ? _steps / _dailyGoal : 0.0;
-
     return SingleChildScrollView(
       padding: EdgeInsets.all(20),
       child: Column(
         children: [
-          // Circular Progress & Status
-          Container(
-            padding: EdgeInsets.all(30),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.blue[400]!, Colors.blue[600]!],
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              children: [
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    SizedBox(
-                      height: 200,
-                      width: 200,
-                      child: CircularProgressIndicator(
-                        value: progress.clamp(0.0, 1.0),
-                        strokeWidth: 12,
-                        backgroundColor: Colors.white.withOpacity(0.3),
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    ),
-                    Column(
-                      children: [
-                        Icon(
-                          _status == 'walking'
-                              ? Icons.directions_walk
-                              : Icons.accessibility_new,
-                          size: 50,
-                          color: Colors.white,
-                        ),
-                        SizedBox(height: 10),
-                        Text(
-                          '$_steps',
-                          style: TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          widget.isEnglish
-                              ? 'of $_dailyGoal Steps'
-                              : '$_dailyGoal স্টেপসের মধ্যে',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                SizedBox(height: 20),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _isWalking
-                        ? Colors.green
-                        : Colors.white.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _isWalking ? Icons.directions_walk : Icons.stop,
-                        color: _isWalking
-                            ? Colors.green[700]
-                            : Colors.redAccent,
-                        size: 30,
-                      ),
-                      SizedBox(width: 10),
-                      Text(
-                        _isWalking
-                            ? (widget.isEnglish ? 'Walking' : 'চলছেন')
-                            : (widget.isEnglish ? 'Stopped' : 'বন্ধ'),
-                        style: TextStyle(
-                          fontSize: 20,
-                          color: _isWalking ? Colors.green[700] : Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          StepProgressSection(
+            status: _status,
+            steps: _steps,
+            dailyGoal: _dailyGoal,
+            isWalking: _isWalking,
+            isEnglish: widget.isEnglish,
           ),
-
           SizedBox(height: 30),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              buildStatCard(
-                icon: Icons.local_fire_department,
-                value: _calories.toStringAsFixed(2),
-                unit: widget.isEnglish ? 'Calories' : 'ক্যালোরি',
-                isDarkTheme: widget.isDarkTheme,
-                isEnglish: widget.isEnglish,
-                color: Colors.orange,
-              ),
-              buildStatCard(
-                icon: Icons.straighten,
-                value: _distance.toStringAsFixed(2),
-                unit: widget.isEnglish ? 'Kilometers' : 'কি.মি',
-                isDarkTheme: widget.isDarkTheme,
-                isEnglish: widget.isEnglish,
-                color: Colors.purple,
-              ),
-              buildStatCard(
-                icon: Icons.timer,
-                value: (_steps * 0.008).toStringAsFixed(0),
-                unit: widget.isEnglish ? 'Minutes' : 'মিনিট',
-                isDarkTheme: widget.isDarkTheme,
-                isEnglish: widget.isEnglish,
-                color: Colors.teal,
-              ),
-            ],
+          StatsRow(
+            calories: _calories,
+            distance: _distance,
+            steps: _steps,
+            isEnglish: widget.isEnglish,
+            isDarkTheme: widget.isDarkTheme,
           ),
-
           SizedBox(height: 30),
-          Container(
-            padding: EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: widget.isDarkTheme ? Color(0xFF3E3B3B) : Colors.white,
-              borderRadius: BorderRadius.circular(15),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  blurRadius: 10,
-                  offset: Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.isEnglish ? 'Weekly Steps' : 'সাপ্তাহিক স্টেপস',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: widget.isDarkTheme ? Colors.white : Colors.blue,
-                  ),
-                ),
-                SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: _weeklyData.map((data) {
-                    final height = (data['steps'] / _dailyGoal * 100).clamp(
-                      10.0,
-                      100.0,
-                    );
-                    final isToday =
-                        DateFormat('dd-MM-yyyy').format(data['date']) ==
-                        DateFormat('dd-MM-yyyy').format(DateTime.now());
-
-                    return Column(
-                      children: [
-                        Container(
-                          width: 35,
-                          height: height.toDouble(),
-                          decoration: BoxDecoration(
-                            gradient: isToday
-                                ? LinearGradient(
-                                    colors: [
-                                      Colors.blue[400]!,
-                                      Colors.blue[600]!,
-                                    ],
-                                  )
-                                : null,
-                            color: !isToday ? Colors.grey[300] : null,
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                        ),
-                        SizedBox(height: 5),
-                        Text(
-                          '${data['day']}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: widget.isDarkTheme
-                                ? Colors.white
-                                : Colors.black,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
+          WeeklyStepsChart(
+            weeklyData: _weeklyData,
+            dailyGoal: _dailyGoal,
+            isDarkTheme: widget.isDarkTheme,
+            isEnglish: widget.isEnglish,
           ),
+          SizedBox(height: 30),
+          WeeklyStatsCards(
+            weeklyData: _weeklyData,
+            isDarkTheme: widget.isDarkTheme,
+            isEnglish: widget.isEnglish,
+          ),
+          SizedBox(height: 50),
         ],
       ),
     );
