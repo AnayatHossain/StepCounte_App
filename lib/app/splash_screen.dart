@@ -43,8 +43,8 @@ class SplashScreenWidget extends StatelessWidget {
             ),
             Text(
               isEnglish
-                  ? "© Anayat Hossain All rights reserved."
-                  : "© এনায়েত হোসেন সর্বস্বত্ব সংরক্ষিত।",
+                  ? "© Md Sirajul Islam All rights reserved."
+                  : "© সর্বস্বত্ব সংরক্ষিত।",
               style: TextStyle(
                 fontSize: 12,
                 color: isDarkTheme ? Colors.white70 : Colors.black54,
